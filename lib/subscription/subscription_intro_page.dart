@@ -1,12 +1,44 @@
 import '../auth/auth_service.dart';
 import 'package:flutter/material.dart';
-import 'subscription_setup_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class SubscriptionIntroPage extends StatelessWidget {
+class SubscriptionIntroPage extends StatefulWidget {
   const SubscriptionIntroPage({super.key});
+
+  @override
+  State<SubscriptionIntroPage> createState() => _SubscriptionIntroPageState();
+}
+
+class _SubscriptionIntroPageState extends State<SubscriptionIntroPage> {
+  bool _loading = false;
 
   Future<void> _logout(BuildContext context) async {
     await AuthService().signOut();
+  }
+
+  Future<void> _getStarted() async {
+    if (_loading) return;
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => _loading = true);
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'subscriptionState': 'PENDING'});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to proceed")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
 
@@ -59,22 +91,24 @@ class SubscriptionIntroPage extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00C853),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SubscriptionSetupPage(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  "Get Started",
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                onPressed: _loading ? null : _getStarted,
+                child: _loading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.black,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        "Get Started",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],

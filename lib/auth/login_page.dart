@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'auth_service.dart';
 import 'user_repository.dart';
-import '../subscription/subscription_intro_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -48,14 +47,6 @@ class _LoginPageState extends State<LoginPage> {
 
                       if (user != null) {
                         await UserRepository().createOrUpdateUser(user);
-                        
-                        if (context.mounted) {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => const SubscriptionIntroPage(),
-                            ),
-                          );
-                        }
                       }
                     } catch (_) {
                       if (context.mounted) {

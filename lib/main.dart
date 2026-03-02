@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auth/login_page.dart';
 import 'home/home_page.dart';
 import 'subscription/subscription_intro_page.dart';
+import 'subscription/subscription_setup_page.dart';
+import 'subscription/renewal_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,46 +43,66 @@ class AuthGate extends StatelessWidget {
 
         final user = authSnapshot.data;
 
-        // Not logged in
         if (user == null) {
           return const LoginPage();
         }
 
-        // Logged in → now check subscription state
         return StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .snapshots(),
           builder: (context, userSnapshot) {
-            if (userSnapshot.connectionState ==
-                ConnectionState.waiting) {
+            if (userSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
-            // New Gmail OR profile not initialized yet
-            if (!userSnapshot.hasData ||
-                userSnapshot.data!.data() == null) {
+            if (!userSnapshot.hasData || userSnapshot.data!.data() == null) {
               return const SubscriptionIntroPage();
             }
 
-            final data =
-                userSnapshot.data!.data() as Map<String, dynamic>;
+            final data = userSnapshot.data!.data() as Map<String, dynamic>;
+            final state = data['subscriptionState'] as String? ?? 'NEW';
 
-            final hasSub =
-                data['hasActiveSubscription'] == true;
+            if (state == 'NEW') {
+              return const SubscriptionIntroPage();
+            }
 
-            if (hasSub) {
+            if (state == 'PENDING') {
+              return const SubscriptionSetupPage();
+            }
+
+            if (state == 'ACTIVE') {
+              final endTimestamp = data['subscriptionEnd'] as Timestamp?;
+              if (endTimestamp != null) {
+                final endDate = endTimestamp.toDate();
+                if (endDate.isBefore(DateTime.now())) {
+                  _updateExpiredSubscription(user.uid);
+                  return const RenewalPage();
+                }
+              }
               return const HomePage();
-            } else {
-              return const SubscriptionIntroPage();
             }
+
+            if (state == 'EXPIRED') {
+              return const RenewalPage();
+            }
+
+            return const SubscriptionIntroPage();
           },
         );
       },
     );
+  }
+
+  Future<void> _updateExpiredSubscription(String uid) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'subscriptionState': 'EXPIRED',
+      });
+    } catch (_) {}
   }
 }
 

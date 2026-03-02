@@ -9,20 +9,17 @@ class UserRepository {
     final doc = await ref.get();
 
     if (!doc.exists) {
-      // 🔑 NEW GMAIL → CLEAN STATE
       await ref.set({
         'uid': user.uid,
         'email': user.email,
         'name': user.displayName,
         'photoUrl': user.photoURL,
-        'hasActiveSubscription': false,
-        'subscriptionId': null,
+        'subscriptionState': 'NEW',
         'lockedMobile': null,
         'createdAt': FieldValue.serverTimestamp(),
         'lastLoginAt': FieldValue.serverTimestamp(),
       });
     } else {
-      // EXISTING USER → DO NOT TOUCH SUBSCRIPTION
       await ref.update({
         'lastLoginAt': FieldValue.serverTimestamp(),
       });

@@ -1,3 +1,4 @@
+import 'transaction_history_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -145,15 +146,30 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0B0F0E),
       appBar: AppBar(
-        title: const Text("Mobile Recharge"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          )
-        ],
-      ),
-      body: Padding(
+	  title: const Text("Recharge"),
+	  actions: [
+
+	    // 🧾 Transaction History
+	    IconButton(
+	      icon: const Icon(Icons.receipt_long),
+	      onPressed: () {
+        	Navigator.push(
+	          context,
+        	  MaterialPageRoute(
+        	    builder: (_) => TransactionHistoryPage(),
+        	  ),
+	        );
+	      },
+	    ),
+
+	    // 🚪 Logout
+	    IconButton(
+	      icon: const Icon(Icons.logout),
+	      onPressed: _logout,
+	    ),
+	  ],
+	),
+	body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
 

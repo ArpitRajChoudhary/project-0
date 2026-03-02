@@ -1,3 +1,6 @@
+import 'package:cloud_functions/cloud_functions.dart';
+import '../payment/payu_webview_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,9 +34,11 @@ class _SubscriptionSetupPageState extends State<SubscriptionSetupPage> {
     }
   }
 
-  Future<void> _activateSubscription() async {
-    if (_loading) return;
+  // TODO: Set to false when integrating Razorpay payment + backend verification
+  // When false, remove 'ACTIVE' from Firestore rules to prevent client-side activation
+  static const bool _testMode = true;
 
+  Future<void> _activateSubscription() async {
     final mobile = _mobileController.text.trim();
 
     if (mobile.length != 10) {
@@ -47,48 +52,46 @@ class _SubscriptionSetupPageState extends State<SubscriptionSetupPage> {
     setState(() => _loading = true);
 
     try {
-      final now = DateTime.now();
-      final endDate =
-          DateTime(now.year + 1, now.month, now.day);
-
-      // Create subscription
-      final subRef =
-          FirebaseFirestore.instance.collection('subscriptions').doc();
-
-      await subRef.set({
-        'uid': user.uid,
-        'mobile': mobile,
-        'status': 'ACTIVE',
-        'startDate': now,
-        'endDate': endDate,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update user profile
+      // 1️⃣ Move to PENDING state first
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .set({
-        'hasActiveSubscription': true,
-        'subscriptionId': subRef.id,
+          .update({
+        'subscriptionState': 'PENDING',
         'lockedMobile': mobile,
-      }, SetOptions(merge: true));
+      });
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-          (route) => false,
-        );
-      }
+    // 2️⃣ Call Cloud Function
+      final functions = FirebaseFunctions.instance;
+
+      final result = await functions
+          .httpsCallable('createPayuPayment')
+          .call({
+        "firstname": user.displayName ?? "User",
+        "email": user.email ?? "test@email.com",
+      });
+
+      final paymentData = Map<String, dynamic>.from(result.data);
+
+      if (!mounted) return;
+
+      // 3️⃣ Open WebView
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PayuWebViewPage(paymentData: paymentData),
+        ),
+      );
 
     } catch (e) {
-      _show("Failed to activate subscription");
+      _show("Payment initialization failed");
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
     }
   }
+
 
   void _show(String msg) {
     ScaffoldMessenger.of(context)
